@@ -71,6 +71,7 @@ mastapa/
 ├── apk/ → File APK hasil build untuk demo  
 ├── assets/ → Icon/logo/asset UI  
 ├── data/ → Contoh file JSON/Spreadsheet dummy  
+├── scripts/ → Script Google Apps Script (API backend)
 └── README.md
 
 
@@ -85,6 +86,25 @@ mastapa/
 - [ ] QR Code struk pembayaran  
 
 ---
+
+## Backend (Google Apps Script)
+
+Proyek ini menggunakan Google Apps Script sebagai API untuk menghubungkan aplikasi Niotron dengan Google Spreadsheet & Google Drive.
+
+Struktur script:
+- `scripts/api.gs` → Endpoint utama untuk menerima request dari aplikasi.
+- `scripts/config.gs` → Konfigurasi Spreadsheet ID dan Drive Folder ID.
+
+## Cara Import AIA ke Kodular
+
+1. Buka [Kodular Creator](https://builder.kodular.io).
+2. Login menggunakan akun Google Anda.
+3. Klik **Projects → Import Project (.aia) from my computer**.
+4. Pilih file `.aia` yang ada di folder `/aia` pada repo ini.
+5. Setelah berhasil di-import, project akan muncul di daftar proyek Anda.
+6. Klik **Open Project** untuk mulai mengedit.
+
+> **Tips:** Setelah selesai membuat perubahan, Anda bisa export kembali project dalam bentuk `.aia` atau langsung build ke `.apk`.
 
 ## 👨‍💻 Dibuat oleh
 **Titan Anggaraksa – Wirodayan Digital**  
