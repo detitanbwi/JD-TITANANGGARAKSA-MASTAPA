@@ -1,13 +1,17 @@
 // Deklarasi konstanta untuk nama Spreadsheet dan Sheet.
 // Ganti 'ID_SPREADSHEET_ANDA' dengan ID Spreadsheet Google Anda.
 // ID bisa ditemukan di URL Spreadsheet, antara '/d/' dan '/edit'.
-const SPREADSHEET_ID = '1tsgJJ0ExLt_6mD8p53dfYUSAOKbYo8eZzdkBIOCAjaU';
-const SHEET_NAME = 'WP';
+const SPREADSHEET_ID = 'SPREADSHEET_ID';
+const SHEET_NAME = 'SHEET_NAME';
 
 // Konstanta untuk ID folder Google Drive tempat gambar akan disimpan.
 // Ganti 'ID_FOLDER_DRIVE_ANDA' dengan ID folder Drive yang Anda inginkan.
 // ID bisa ditemukan di URL folder Drive Anda.
-const DRIVE_FOLDER_ID = '1O7BMWMuVsXyPhkh8KQolJsry1bJOBu86';
+const DRIVE_FOLDER_ID = 'FOLDER_ID';
+
+// Konstanta untuk Fonnte API Token.
+// Ganti 'TOKEN_FONNTE_ANDA' dengan token API dari akun Fonnte Anda.
+const FONNTE_API_TOKEN = 'TOKEN_FONNTE';
 
 /**
  * Fungsi doGet() akan dipicu saat Web App diakses dengan metode GET.
@@ -100,6 +104,7 @@ function doPost(e) {
       const data = JSON.parse(e.postData.contents);
       
       const nopToUpdate = data.nop || '';
+      const whatsappNumber = data.wa || '';
       
       // Jika tidak ada NOP, kembalikan error.
       if (!nopToUpdate) {
@@ -113,9 +118,11 @@ function doPost(e) {
 
       // Cari baris yang cocok dengan NOP.
       let rowIndex = -1;
+      let rowData = null;
       for (let i = 1; i < sheetData.length; i++) {
         if (String(sheetData[i][0]).trim() === String(nopToUpdate).trim()) {
           rowIndex = i;
+          rowData = sheetData[i];
           break;
         }
       }
@@ -130,13 +137,11 @@ function doPost(e) {
           buktiGambarUrl = saveImageToDrive(buktiGambarBase64, nopToUpdate);
         }
 
-        // Dapatkan data baris yang akan diperbarui.
-        const rowData = sheetData[rowIndex];
-        
         // Perbarui status Lunas dan Tanggal Lunas.
         // Asumsi kolom "Lunas" di indeks 5 dan "Tanggal Lunas" di indeks 6.
         rowData[5] = 'Lunas';
-        rowData[6] = new Date().toLocaleString();
+        const tanggalLunas = Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss");
+        rowData[6] = tanggalLunas;
         
         // Jika ada bukti gambar, perbarui URL-nya.
         // Asumsi kolom "Bukti Gambar" di indeks 7.
@@ -147,6 +152,21 @@ function doPost(e) {
         // Setel kembali nilai-nilai ke baris yang ditemukan.
         // Plus 1 karena getRange() dimulai dari 1, sedangkan array dimulai dari 0.
         sheet.getRange(rowIndex + 1, 1, 1, rowData.length).setValues([rowData]);
+
+        // Kirim pesan WhatsApp jika nomor WA tersedia.
+        if (whatsappNumber) {
+          const namaWajibPajak = rowData[1];
+          const nominalPajak = rowData[3];
+          const tahunPajak = rowData[4];
+          let pesan = `Hai ${namaWajibPajak}, pembayaran pajak NOP ${nopToUpdate} untuk tahun ${tahunPajak} sebesar ${nominalPajak} telah lunas. Terima kasih.`;
+
+          // Tambahkan URL bukti gambar jika tidak ada kesalahan
+          if (buktiGambarUrl && !buktiGambarUrl.includes('URL Gagal')) {
+            pesan += `\n\nBukti pembayaran:\n${buktiGambarUrl}`;
+          }
+
+          sendWhatsappMessage(whatsappNumber, pesan);
+        }
 
         return createJsonResponse({ status: 'success', message: `Data untuk NOP ${nopToUpdate} berhasil diperbarui.` });
 
@@ -162,6 +182,41 @@ function doPost(e) {
   } else {
     // Jika format data bukan JSON, kembalikan error.
     return createJsonResponse({ status: 'error', message: 'Hanya menerima data JSON.' });
+  }
+}
+
+/**
+ * Fungsi helper untuk mengirim pesan WhatsApp melalui Fonnte API.
+ *
+ * @param {string} targetNumber - Nomor telepon target.
+ * @param {string} messageText - Isi pesan yang akan dikirim.
+ */
+function sendWhatsappMessage(targetNumber, messageText) {
+  // URL API Fonnte
+  const apiUrl = 'https://api.fonnte.com/send';
+
+  // Payload data untuk permintaan POST
+  const payload = {
+    target: targetNumber,
+    message: messageText,
+    countryCode: '62',
+    typing: false,
+    delay: 2
+  };
+  
+  const options = {
+    'method': 'post',
+    'payload': payload,
+    'headers': {
+      'Authorization': FONNTE_API_TOKEN
+    }
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(apiUrl, options);
+    Logger.log('Fonnte API response: ' + response.getContentText());
+  } catch (e) {
+    Logger.log('Error sending WhatsApp message: ' + e.message);
   }
 }
 
