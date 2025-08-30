@@ -96,6 +96,11 @@ function doGet(e) {
  * @param {object} e - Objek event yang berisi data POST.
  * @return {object} - Output JSON dari status operasi.
  */
+// function doPost(e) {
+//   const data = JSON.parse(e.postData.contents);
+//   return createJsonResponse({ status: 'error', message: data.bukti_gambar });
+// }
+
 function doPost(e) {
   // Pastikan data POST dalam format JSON.
   if (e.postData.type === 'application/json') {
@@ -134,19 +139,28 @@ function doPost(e) {
         
         // Unggah gambar jika ada.
         if (buktiGambarBase64) {
+          // Log panjang string untuk debugging
+          Logger.log('Panjang string Base64 yang diterima: ' + buktiGambarBase64.length);
           buktiGambarUrl = saveImageToDrive(buktiGambarBase64, nopToUpdate);
         }
 
         // Perbarui status Lunas dan Tanggal Lunas.
         // Asumsi kolom "Lunas" di indeks 5 dan "Tanggal Lunas" di indeks 6.
         rowData[5] = 'Lunas';
-        const tanggalLunas = Utilities.formatDate(new Date(), SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss");
+        
+        // Menggunakan Utilities.formatDate untuk format yang lebih konsisten.
+        const tanggalLunas = Utilities.formatDate(new Date(), ss.getSpreadsheetTimeZone(), "dd/MM/yyyy HH:mm:ss");
         rowData[6] = tanggalLunas;
         
         // Jika ada bukti gambar, perbarui URL-nya.
         // Asumsi kolom "Bukti Gambar" di indeks 7.
         if (buktiGambarUrl) {
           rowData[7] = buktiGambarUrl;
+        }
+
+        // Tambahkan nomor WA ke kolom ke-9 (indeks 8).
+        if (whatsappNumber) {
+          rowData[8] = whatsappNumber;
         }
         
         // Setel kembali nilai-nilai ke baris yang ditemukan.
@@ -176,7 +190,8 @@ function doPost(e) {
       }
 
     } catch (error) {
-      // Tangani kesalahan.
+      // Tangani kesalahan dan log pesan error yang lebih spesifik.
+      Logger.log('Error saat memproses permintaan: ' + error.message);
       return createJsonResponse({ status: 'error', message: 'Gagal memproses permintaan.', details: error.message });
     }
   } else {
@@ -230,9 +245,12 @@ function sendWhatsappMessage(targetNumber, messageText) {
 function saveImageToDrive(base64Data, fileNamePrefix) {
   try {
     // Menghapus awalan 'data:image/jpeg;base64,' jika ada.
-    const base64Cleaned = base64Data.split(',')[1] || base64Data;
+    let base64Cleaned = base64Data.split(',')[1] || base64Data;
     
-    // Mendekode string Base64.
+    // Mengganti karakter non-standar Base64 (URL-safe) dengan karakter standar.
+    base64Cleaned = base64Cleaned.replace(/-/g, '+').replace(/_/g, '/');
+
+    // Mendekode string Base64 yang sudah bersih.
     const decodedBlob = Utilities.newBlob(Utilities.base64Decode(base64Cleaned), MimeType.JPEG, `${fileNamePrefix}_bukti_pembayaran.jpg`);
     
     // Mengakses folder Google Drive.
@@ -245,8 +263,8 @@ function saveImageToDrive(base64Data, fileNamePrefix) {
     file.setSharing(DriveApp.Access.ANYONE, DriveApp.Permission.VIEW);
     
     // Mengembalikan URL "direct" atau URL untuk melihat file.
-    // URL direct lebih mudah diproses oleh aplikasi.
-    return file.getUrl();
+    // Format ini yang dibutuhkan oleh komponen image.
+    return `https://drive.google.com/uc?export=view&id=${file.getId()}`;
 
   } catch (error) {
     // Menangani error saat mengunggah ke Drive.
